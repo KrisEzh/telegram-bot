@@ -4,6 +4,8 @@
 -- changeset KrisEzh:1
 CREATE TABLE notification_task (
                        id SERIAL,
+                       chatId INT,
                        text TEXT,
                        Local_Date_Time timestamp
 )
+
