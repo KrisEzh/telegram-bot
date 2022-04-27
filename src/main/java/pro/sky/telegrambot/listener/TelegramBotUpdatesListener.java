@@ -2,9 +2,9 @@ package pro.sky.telegrambot.listener;
 
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
+import com.pengrad.telegrambot.model.Message;
 import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.request.SendMessage;
-import com.pengrad.telegrambot.response.SendResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,46 +40,50 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
     public void init() {
         telegramBot.setUpdatesListener(this);
     }
-
     @Override
     public int process(List<Update> updates) {
         updates.forEach(update -> {
             logger.info("Processing update: {}", update);
+            Message message = update.message();
+            long chatId = update.message().chat().id();
             if (update.message().text().equals(new String("/start"))) {
-                long chatId = update.message().chat().id();
-                SendResponse response = telegramBot.execute(new SendMessage(chatId, "Приветик!Пришли мне сообщение вида 01.01.2022 20:00 Сделать домашнюю работу, а я напомню тебе о нем в нужное время))"));
+                telegramBot.execute(new SendMessage(chatId, "Приветик!Пришли мне сообщение вида 01.01.2022 20:00 Сделать домашнюю работу, а я напомню тебе о нем в нужное время))"));
             } else {
-                try {
-                    String message = update.message().text();
-                    Pattern pattern = Pattern.compile("([0-9\\.\\:\\s]{16})(\\s)([\\W+]+)");
-                    Matcher matcher = pattern.matcher(message);
-                    if (matcher.matches()) {
-                        String time = matcher.group(1);
-                        String text = matcher.group(3);
-                        int chatId = Math.toIntExact(update.message().chat().id());
-                        LocalDateTime date2 = LocalDateTime.parse(time, DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
-                        NotificationTask object = new NotificationTask(chatId, date2, text);
-                        notificationTaskRepository.save(object);
-                        telegramBot.execute(new SendMessage(chatId, "Я напомню тебе"));
-                    }
-                } catch (DateTimeException e) {
-                }
+               parsedMessage(message);
+               telegramBot.execute(new SendMessage(chatId, "Я напомню тебе"));
             }
         });
         return UpdatesListener.CONFIRMED_UPDATES_ALL;
+    }
+    public void parsedMessage(Message message) {
+        try {
+            Pattern pattern = Pattern.compile("([0-9\\.\\:\\s]{16})(\\s)([\\W+]+)");
+            Matcher matcher = pattern.matcher(message.text());
+            if (matcher.matches()) {
+                String time = matcher.group(1);
+                String text = matcher.group(3);
+                LocalDateTime parsedDate = LocalDateTime.parse(time, DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+                NotificationTask object = new NotificationTask(message.chat().id(),parsedDate, text);
+                notificationTaskRepository.save(object);
+            }
+        } catch (DateTimeException e) {
+            throw new DateTimeException("Введите дату правильно");
+        }
     }
 
     @Scheduled(fixedDelay = 60_000L)
     public void findMessage() {
         try {
             LocalDateTime currentTime = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
-            NotificationTask notificationTask = notificationTaskRepository.findByLocalDateTimeEquals(currentTime);
+            List<NotificationTask> notifications = notificationTaskRepository.findByLocalDateTimeEquals(currentTime);
             logger.info("ищу");
-            if (notificationTask != null) {
-                telegramBot.execute(new SendMessage(notificationTask.getChatId(), "Не забудь сделать то, что хотел"));
+            for(NotificationTask notificationTask:notifications) {
+                if (notificationTask != null) {
+                    telegramBot.execute(new SendMessage(notificationTask.getChatId(), "Не забудь о " + notificationTask.getText()));
+                }
             }
-
         } catch (RuntimeException e) {
+            throw new RuntimeException();
         }
     }
 }

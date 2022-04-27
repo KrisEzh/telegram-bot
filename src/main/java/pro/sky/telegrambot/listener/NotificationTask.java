@@ -9,11 +9,11 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "notification_task")
-public class NotificationTask<N> {
+public class NotificationTask {
 
     @Id
     @GeneratedValue
-    private long id;
+    private Long id;
 
     private String text;
     private LocalDateTime localDateTime;
@@ -38,7 +38,7 @@ public class NotificationTask<N> {
         this.chatId = chatId;
     }
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 
@@ -66,7 +66,7 @@ public class NotificationTask<N> {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        NotificationTask<?> that = (NotificationTask<?>) o;
+        NotificationTask that = (NotificationTask) o;
         return id == that.id && chatId == that.chatId && Objects.equals(text, that.text) && Objects.equals(localDateTime, that.localDateTime);
     }
 
